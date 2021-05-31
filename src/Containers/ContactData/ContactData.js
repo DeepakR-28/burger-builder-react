@@ -1,11 +1,13 @@
 import React ,{Component} from 'react'
+import { connect } from 'react-redux'
 
 import classes from './ContactData.css'
 import Button from '../../Components/UI/Button/Button'
 import Spinner from '../../Components/UI/Spinner/Spinner'
 import axios from '../../axios-order'
 import Input from '../../Components/UI/Input/Input'
-
+import * as actions from '../../Store/actions/index'
+import withErrorHandler from '../../hoc/withErrorHandler/withErrorHandler'
 class ContactData extends Component{
     state = {
         orderForm : {
@@ -76,14 +78,13 @@ class ContactData extends Component{
                 elementConfig : {
                     options : [{value : "fastest" , displayValue :"Fastest"}, {value : "Normal" , displayValue :"Standard"}]
                 },
-                value : "",
+                value : "Standard",
                 validation:{
                     required: false
                 },
                 touched: false
             }
             },
-            loading : false,
             totalPrice : 0,
             isValidForm : false
     }
@@ -103,25 +104,18 @@ class ContactData extends Component{
     }
     placeOrderHandler = (event) =>{
         event.preventDefault();
-         this.setState({ loading: true })
+        
          const formData = { }
          for(let formElementIdentifier in this.state.orderForm ){
              formData[formElementIdentifier] = this.state.orderForm[formElementIdentifier].value
          }
         const order = {
-            ingredients : this.props.ingredients,
+            ingredients : this.props.ings,
             Amount : this.props.price,
-            orderData : formData
+            orderData : formData,
+            userId : this.props.userId
         }
-        axios.post('/orders.json', order)
-        .then(response =>{
-            this.setState({ loading: false})
-            window.alert("Order Place Successfully!!!")
-            this.props.history.push('/')
-        })
-        .catch(error =>{
-            this.setState({ loading: false  })
-        })
+        this.props.onOrderBurger(order,this.props.token)
     }
     onChangeHandler = (event,inputIdentifier) =>{
         const updatedContactForm = {
@@ -135,7 +129,7 @@ class ContactData extends Component{
         for(let validity in updatedFormElement){
             isValidForm = updatedFormElement[validity] && isValidForm
         }
-        console.log(isValidForm)
+        
         // console.log(updatedFormElement)
         updatedContactForm[inputIdentifier] = updatedFormElement
         this.setState({
@@ -151,9 +145,7 @@ class ContactData extends Component{
                 id : key,
                 config : this.state.orderForm[key]
             })
-        }
-        console.log(orderFormArray)
-    
+        }    
         let form = (<form onSubmit = {this.placeOrderHandler} className = {classes.form}>
 
                     {orderFormArray.map(orderField =>{
@@ -167,12 +159,11 @@ class ContactData extends Component{
                                 shouldValidate = {orderField.config.validation.required}
                                 touched = {orderField.config.touched}
                                  />
-                                
                     })}
                     <Button disabled = {!this.state.isValidForm} btnType = "Success">Place Order</Button>
                     </form>
                     )
-        if(this.state.loading === true){
+        if(this.props.loading === true){
             form = <Spinner />
         }
         return(
@@ -183,4 +174,21 @@ class ContactData extends Component{
         )
     }
 }
-export default ContactData
+
+const mapStateToProps = state =>{
+    return {
+        ings : state.burgerBuilder.ingredients,
+        price : state.burgerBuilder.price,
+        loading: state.order.loading,
+        token : state.auth.token,
+        userId : state.auth.userId
+    }
+}
+
+const mapDispatchToProps = dispatch =>{
+    return {
+        onOrderBurger : (orderData,token) => dispatch(actions.burgerPurchase(orderData,token))
+    }
+}
+
+export default connect(mapStateToProps,mapDispatchToProps)(withErrorHandler(ContactData,axios))
